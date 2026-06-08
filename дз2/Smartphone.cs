@@ -2,18 +2,16 @@ using System;
 
 namespace ElectronicsStore
 {
-    /// <summary>
-    /// Смартфон (Основная таблица, сторона «много»)
-    /// </summary>
+
     public class Smartphone
     {
-        /// <summary>Идентификатор смартфона (Первичный ключ)</summary>
+        
         public int Id { get; set; }
 
-        /// <summary>Идентификатор производителя (Внешний ключ -> manufacturer.mfg_id)</summary>
+        
         public int ManufacturerId { get; set; }
 
-        /// <summary>Коммерческое название модели</summary>
+
         public string Name { get; set; }
 
         private int _price;

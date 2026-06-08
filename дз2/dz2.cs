@@ -1,6 +1,5 @@
 using System;
 using System.Text;
-using System.IO;
 
 namespace ElectronicsStore
 {
@@ -8,18 +7,13 @@ namespace ElectronicsStore
     {
         static void Main(string[] args)
         {
-
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
-            string dbFile = "smartphones.db";
-            string mfgCsvPath = Path.Combine(AppContext.BaseDirectory, "manufacturer.csv");
-            string phnCsvPath = Path.Combine(AppContext.BaseDirectory, "smartphone.csv");
+            var db = new DatabaseManager();
+            db.Init();
 
-            var db = new DatabaseManager(dbFile);
-            db.InitializeDatabase(mfgCsvPath, phnCsvPath);
-
-            string userChoice;
+            string choice;
             do
             {
                 Console.WriteLine("\n=========================================");
@@ -33,46 +27,44 @@ namespace ElectronicsStore
                 Console.WriteLine("6 - Перейти в блок аналитических Отчётов");
                 Console.WriteLine("0 - Завершить работу");
                 Console.Write("Введите номер действия: ");
-                userChoice = Console.ReadLine()?.Trim() ?? "";
+                choice = Console.ReadLine()?.Trim() ?? "";
 
-                switch (userChoice)
+                switch (choice)
                 {
-                    case "1": ShowAllBrands(db); break;
-                    case "2": ShowAllPhones(db); break;
-                    case "3": CreateNewPhone(db); break;
-                    case "4": ModifyExistingPhone(db); break;
-                    case "5": RemovePhoneFromDb(db); break;
-                    case "6": ViewReportsMenu(db); break;
-                    case "0": Console.WriteLine("\n[Инфо] Сессия закрыта. Программа успешно завершена."); break;
-                    default: Console.WriteLine("\n[Предупреждение] Ошибка ввода: Такого пункта меню нет."); break;
+                    case "1": ShowBrands(db); break;
+                    case "2": ShowPhones(db); break;
+                    case "3": CreatePhone(db); break;
+                    case "4": ModifyPhone(db); break;
+                    case "5": RemovePhone(db); break;
+                    case "6": ViewReports(db); break;
+                    case "0": Console.WriteLine("\nРабота завершена."); break;
+                    default: Console.WriteLine("\nОшибка: такого пункта нет."); break;
                 }
-            } while (userChoice != "0");
+            } while (choice != "0");
         }
 
-        static void ShowAllBrands(DatabaseManager db)
+        static void ShowBrands(DatabaseManager db)
         {
             Console.WriteLine("\n--- Производители в системе ---");
-            var brands = db.GetAllManufacturers();
-            foreach (var b in brands) Console.WriteLine($" {b}");
+            foreach (var b in db.GetBrands()) Console.WriteLine($" {b}");
         }
 
-        static void ShowAllPhones(DatabaseManager db)
+        static void ShowPhones(DatabaseManager db)
         {
             Console.WriteLine("\n--- Модели смартфонов в наличии ---");
-            var phones = db.GetAllSmartphones();
-            foreach (var p in phones) Console.WriteLine($" {p}");
-            Console.WriteLine($"Всего на складе: {phones.Count} позиций.");
+            var list = db.GetPhones();
+            foreach (var p in list) Console.WriteLine($" {p}");
+            Console.WriteLine($"Всего на складе: {list.Count} позиций.");
         }
 
-        static void CreateNewPhone(DatabaseManager db)
+        static void CreatePhone(DatabaseManager db)
         {
             Console.WriteLine("\n--- Регистрация нового смартфона ---");
-            ShowAllBrands(db);
-
+            ShowBrands(db);
             Console.Write("Укажите числовой код производителя (ID): ");
             if (!int.TryParse(Console.ReadLine(), out int mfgId)) return;
 
-            Console.Write("Введите название модели (например, Redmi Note 13): ");
+            Console.Write("Введите название модели: ");
             string name = Console.ReadLine()?.Trim() ?? "";
             if (string.IsNullOrEmpty(name)) return;
 
@@ -81,39 +73,33 @@ namespace ElectronicsStore
 
             try
             {
-                var phone = new Smartphone(0, mfgId, name, price);
-                db.AddSmartphone(phone);
-                Console.WriteLine("[Успех] Смартфон успешно добавлен в базу данных.");
+                var testPhone = new Smartphone(0, mfgId, name, price);
+                db.AddPhone(testPhone.ManufacturerId, testPhone.Name, testPhone.Price);
+                Console.WriteLine("[Успех] Смартфон добавлен.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Провал операции]: {ex.Message}");
+                Console.WriteLine($"[Ошибка]: {ex.Message}");
             }
         }
 
-        static void ModifyExistingPhone(DatabaseManager db)
+        static void ModifyPhone(DatabaseManager db)
         {
-            Console.WriteLine("\n--- Изменение параметров существующей модели ---");
+            Console.WriteLine("\n--- Изменение параметров смартфона ---");
             Console.Write("Введите ID изменяемого смартфона: ");
             if (!int.TryParse(Console.ReadLine(), out int id)) return;
 
-            var phone = db.GetSmartphoneById(id);
+            var phone = db.GetPhoneById(id);
             if (phone == null)
             {
-                Console.WriteLine("[Ошибка] Запись с таким ID не обнаружена в системе.");
+                Console.WriteLine("[Ошибка] Смартфон не найден.");
                 return;
             }
 
             Console.WriteLine($"Текущие данные: {phone}");
-            Console.WriteLine("(Если поле не нужно менять, просто нажмите Enter)");
-
             Console.Write($"Новое наименование [{phone.Name}]: ");
             string nInput = Console.ReadLine()?.Trim() ?? "";
             if (nInput.Length > 0) phone.Name = nInput;
-
-            Console.Write($"Новый ID бренда [{phone.ManufacturerId}]: ");
-            string bInput = Console.ReadLine()?.Trim() ?? "";
-            if (bInput.Length > 0 && int.TryParse(bInput, out int newMfgId)) phone.ManufacturerId = newMfgId;
 
             Console.Write($"Новая цена [{phone.Price}]: ");
             string pInput = Console.ReadLine()?.Trim() ?? "";
@@ -123,28 +109,21 @@ namespace ElectronicsStore
                 catch (Exception ex) { Console.WriteLine($"[Ошибка]: {ex.Message}"); return; }
             }
 
-            db.UpdateSmartphone(phone);
+            db.UpdatePhone(phone);
             Console.WriteLine("[Успех] Информация обновлена.");
         }
 
-        static void RemovePhoneFromDb(DatabaseManager db)
+        static void RemovePhone(DatabaseManager db)
         {
             Console.WriteLine("\n--- Удаление позиции ---");
-            Console.Write("Введите ID смартфона, который нужно стереть: ");
+            Console.Write("Введите ID смартфона, который нужно удалить: ");
             if (!int.TryParse(Console.ReadLine(), out int id)) return;
 
-            var phone = db.GetSmartphoneById(id);
-            if (phone == null) return;
-
-            Console.Write($"Подтвердите действие: Стереть {phone.Name}? (да/нет): ");
-            if (Console.ReadLine()?.Trim().ToLower() == "да")
-            {
-                db.DeleteSmartphone(id);
-                Console.WriteLine("[Успех] Запись ликвидирована.");
-            }
+            db.DeletePhone(id);
+            Console.WriteLine("[Успех] Запись ликвидирована.");
         }
 
-        static void ViewReportsMenu(DatabaseManager db)
+        static void ViewReports(DatabaseManager db)
         {
             string repChoice;
             do
@@ -152,67 +131,44 @@ namespace ElectronicsStore
                 Console.WriteLine("\n-----------------------------------------");
                 Console.WriteLine("          АНАЛИТИЧЕСКИЕ ОТЧЕТЫ           ");
                 Console.WriteLine("-----------------------------------------");
-                Console.WriteLine("1 - Прайс-лист смартфонов с привязкой бренда (JOIN)");
-                Console.WriteLine("2 - Подсчет количества моделей по брендам (GROUP BY + COUNT)");
-                Console.WriteLine("3 - Расчет средней стоимости техники бренда (GROUP BY + AVG)");
+                Console.WriteLine("1 - Прайс-лист смартфонов (JOIN)");
+                Console.WriteLine("2 - Подсчет количества моделей (GROUP BY + COUNT)");
+                Console.WriteLine("3 - Расчет средней стоимости (GROUP BY + AVG)");
                 Console.WriteLine("0 - Вернуться в основное меню");
                 Console.Write("Выберите отчет: ");
                 repChoice = Console.ReadLine()?.Trim() ?? "";
 
                 switch (repChoice)
                 {
-                    case "1": ExecuteReport1(db); break;
-                    case "2": ExecuteReport2(db); break;
-                    case "3": ExecuteReport3(db); break;
+                    case "1":
+                        new ReportBuilder(db)
+                            .Query("SELECT p.phn_name, m.mfg_name, p.phn_price FROM smartphone p JOIN manufacturer m ON p.mfg_id = m.mfg_id ORDER BY p.phn_name ASC")
+                            .Title("ПОЛНЫЙ ПРАЙС-ЛИСТ СМАРТФОНОВ")
+                            .Header("Модель смартфона", "Бренд", "Цена (руб.)")
+                            .ColumnWidths(25, 20, 15)
+                            .Footer("Всего наименований в прайсе")
+                            .Print();
+                        break;
+                    case "2":
+                        new ReportBuilder(db)
+                            .Query("SELECT m.mfg_name, COUNT(*) FROM smartphone p JOIN manufacturer m ON p.mfg_id = m.mfg_id GROUP BY m.mfg_name")
+                            .Title("ОБЪЕМ МОДЕЛЬНОГО РЯДА ПО БРЕНДАМ")
+                            .Header("Бренд производитель", "Количество моделей")
+                            .ColumnWidths(25, 25)
+                            .Footer("Проанализировано торговых марок")
+                            .Print();
+                        break;
+                    case "3":
+                        new ReportBuilder(db)
+                            .Query("SELECT m.mfg_name, ROUND(AVG(p.phn_price), 2) FROM smartphone p JOIN manufacturer m ON p.mfg_id = m.mfg_id GROUP BY m.mfg_name")
+                            .Title("СРЕДНЯЯ ЦЕНА СМАРТФОНОВ ПО БРЕНДАМ")
+                            .Header("Бренд производитель", "Средняя стоимость")
+                            .ColumnWidths(25, 25)
+                            .Footer("Количество исследованных сегментов")
+                            .Print();
+                        break;
                 }
             } while (repChoice != "0");
-        }
-
-
-        static void ExecuteReport1(DatabaseManager db)
-        {
-            new ReportBuilder(db)
-                .Query(@"SELECT p.phn_name, m.mfg_name, p.phn_price 
-                         FROM smartphone p 
-                         JOIN manufacturer m ON p.mfg_id = m.mfg_id 
-                         ORDER BY p.phn_name ASC")
-                .Title("ПОЛНЫЙ ПРАЙС-ЛИСТ СМАРТФОНОВ С УКАЗАНИЕМ БРЕНДА")
-                .Header("Модель смартфона", "Бренд производитель", "Цена (руб.)")
-                .ColumnWidths(25, 25, 15)
-                .Footer("Всего наименований электроники в прайсе") // Использование функционала Группы В
-                .Print();
-        }
-
-
-        static void ExecuteReport2(DatabaseManager db)
-        {
-            new ReportBuilder(db)
-                .Query(@"SELECT m.mfg_name, COUNT(*) AS total_models 
-                         FROM smartphone p 
-                         JOIN manufacturer m ON p.mfg_id = m.mfg_id 
-                         GROUP BY m.mfg_name 
-                         ORDER BY total_models DESC")
-                .Title("ОБЪЕМ МОДЕЛЬНОГО РЯДА ПО БРЕНДАМ")
-                .Header("Бренд производитель", "Количество доступных моделей")
-                .ColumnWidths(25, 30)
-                .Footer("Проанализировано торговых марок") // Использование функционала Группы В
-                .Print();
-        }
-
-
-        static void ExecuteReport3(DatabaseManager db)
-        {
-            new ReportBuilder(db)
-                .Query(@"SELECT m.mfg_name, ROUND(AVG(p.phn_price), 2) AS average_cost 
-                         FROM smartphone p 
-                         JOIN manufacturer m ON p.mfg_id = m.mfg_id 
-                         GROUP BY m.mfg_name 
-                         ORDER BY average_cost DESC")
-                .Title("СРЕДНЯЯ ЦЕНОВАЯ КАТЕГОРИЯ СМАРТФОНОВ")
-                .Header("Бренд производитель", "Средняя стоимость (руб.)")
-                .ColumnWidths(25, 25)
-                .Footer("Количество исследованных сегментов") // Использование функционала Группы В
-                .Print();
         }
     }
 }
